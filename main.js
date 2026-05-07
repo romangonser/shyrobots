@@ -1,60 +1,80 @@
-// SPLINE URL
-const splineUrl =
-  'https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode';
+import { Application } from 'https://unpkg.com/@splinetool/runtime@1.9.82/build/runtime.js';
 
-const mount = document.querySelector('#spline-mount');
+const canvas = document.getElementById('spline-canvas');
+const spline = new Application(canvas);
 
-const viewer = document.createElement('spline-viewer');
+spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then(() => {
+  console.log('geladen');
 
-viewer.setAttribute('url', splineUrl);
-viewer.setAttribute('background', 'transparent');
+  const buttons = {
+    red: document.querySelector('.btn--red'),
+    green: document.querySelector('.btn--green'),
+    blue: document.querySelector('.btn--blue'),
+  };
 
-viewer.style.width = '100%';
-viewer.style.height = '100%';
+  let lastActiveColor = 'color-basestate';
 
-mount.appendChild(viewer);
-
-function setSplineVar(name, value) {
-  if (typeof viewer.setVariable === 'function') {
-    viewer.setVariable(name, value);
+  function safeSetVar(name, value) {
+    if (spline && typeof spline.setVariable === 'function') {
+      spline.setVariable(name, value);
+      console.log(`${name} ->`, value);
+    } else {
+      console.error('spline.setVariable not available');
+    }
   }
-}
 
-// Set up button click handlers immediately
-const btnRed = document.querySelector('.btn--red');
-const btnGreen = document.querySelector('.btn--green');
-const btnBlue = document.querySelector('.btn--blue');
+  function getColorState() {
+    const r = buttons.red.classList.contains('is-active');
+    const g = buttons.green.classList.contains('is-active');
+    const b = buttons.blue.classList.contains('is-active');
 
-btnRed.addEventListener('click', () => {
-  console.log('RED clicked');
-  const state = btnRed.classList.toggle('is-active');
-  console.log('RED is-active:', state);
-  btnRed.setAttribute('aria-pressed', state);
-  setSplineVar('color-red', state);
+    // Build color from binary state (RGB)
+    if (r && g && b) return 'color-white';
+    if (r && g) return 'color-yellow';
+    if (g && b) return 'color-cyan';
+    if (r && b) return 'color-magenta';
+    if (r) return 'color-red';
+    if (g) return 'color-green';
+    if (b) return 'color-blue';
+    return 'color-basestate';
+  }
+
+  function updateColor() {
+    const newColor = getColorState();
+
+    if (newColor !== lastActiveColor) {
+      // Turn off old color
+      if (lastActiveColor !== 'color-basestate') {
+        safeSetVar(lastActiveColor, false);
+      } else {
+        safeSetVar('color-basestate', false);
+      }
+
+      // Turn on new color
+      if (newColor !== 'color-basestate') {
+        safeSetVar(newColor, true);
+      } else {
+        safeSetVar('color-basestate', true);
+      }
+
+      lastActiveColor = newColor;
+      console.log('Color combo:', newColor);
+    }
+  }
+
+  function toggleButton(btn) {
+    btn.classList.toggle('is-active');
+    btn.setAttribute('aria-pressed', String(btn.classList.contains('is-active')));
+    updateColor();
+  }
+
+  // Attach listeners
+  Object.values(buttons).forEach(btn => {
+    if (btn) btn.addEventListener('click', () => toggleButton(btn));
+  });
 });
 
-btnGreen.addEventListener('click', () => {
-  console.log('GREEN clicked');
-  const state = btnGreen.classList.toggle('is-active');
-  console.log('GREEN is-active:', state);
-  btnGreen.setAttribute('aria-pressed', state);
-  setSplineVar('color-green', state);
-  setSplineVar('color-red', state);
-});
-
-btnBlue.addEventListener('click', () => {
-  console.log('BLUE clicked');
-  const state = btnBlue.classList.toggle('is-active');
-  console.log('BLUE is-active:', state);
-  btnBlue.setAttribute('aria-pressed', state);
-  setSplineVar('color-blue', state);
-});
-
-viewer.addEventListener('load', () => {
-  console.log('Viewer loaded');
-});
-
-// ── Cursor-Glow-Effekt (optional) ──
+// Cursor Glow
 const glow = document.createElement('div');
 glow.style.cssText = `
   position: fixed;
@@ -64,12 +84,10 @@ glow.style.cssText = `
   background: radial-gradient(circle, rgba(232,255,71,0.04) 0%, transparent 70%);
   pointer-events: none;
   transform: translate(-50%, -50%);
-  transition: opacity 0.3s;
   z-index: 10;
 `;
 document.body.appendChild(glow);
-
 document.addEventListener('mousemove', (e) => {
   glow.style.left = e.clientX + 'px';
-  glow.style.top  = e.clientY + 'px';
+  glow.style.top = e.clientY + 'px';
 });
