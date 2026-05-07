@@ -3,8 +3,44 @@ import { Application } from 'https://unpkg.com/@splinetool/runtime@1.9.82/build/
 const canvas = document.getElementById('spline-canvas');
 const spline = new Application(canvas);
 
+const splineDebug = document.createElement('div');
+splineDebug.style.cssText = `
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 12px/1.3 system-ui, sans-serif;
+  pointer-events: none;
+`;
+splineDebug.textContent = 'Spline debug: waiting...';
+document.body.appendChild(splineDebug);
+
+function safeSetVar(name, value) {
+  if (spline && typeof spline.setVariable === 'function') {
+    spline.setVariable(name, value);
+    console.log(`${name} ->`, value);
+    splineDebug.textContent = `${name} -> ${value}`;
+    return value;
+  } else {
+    console.warn('spline.setVariable not available yet for', name);
+    splineDebug.textContent = `spline.setVariable not available yet for ${name}`;
+    return false;
+  }
+}
+
+window.__setSplineVar = safeSetVar;
+window.__triggerRxInside = (value = true) => safeSetVar('rx-inside', value);
+window.__splineDebug = splineDebug;
 spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then(() => {
   console.log('geladen');
+  // ensure rx-run is active at start
+  safeSetVar('rx-run', true);
+  safeSetVar('rx-run-nonvisible', false);
+  safeSetVar('rx-inside-nonvisible', false);
 
   const buttons = {
     red: document.querySelector('.btn--red'),
@@ -14,14 +50,7 @@ spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then
 
   let lastActiveColor = 'color-basestate';
 
-  function safeSetVar(name, value) {
-    if (spline && typeof spline.setVariable === 'function') {
-      spline.setVariable(name, value);
-      console.log(`${name} ->`, value);
-    } else {
-      console.error('spline.setVariable not available');
-    }
-  }
+  // reuse global safeSetVar
 
   function getColorState() {
     const r = buttons.red.classList.contains('is-active');
@@ -59,6 +88,12 @@ spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then
 
       lastActiveColor = newColor;
       console.log('Color combo:', newColor);
+      // if magenta is active, enable rx-inside; otherwise disable it
+      if (newColor === 'color-magenta') {
+        safeSetVar('rx-inside', true);
+      } else {
+        safeSetVar('rx-inside', false);
+      }
     }
   }
 
@@ -90,4 +125,13 @@ document.body.appendChild(glow);
 document.addEventListener('mousemove', (e) => {
   glow.style.left = e.clientX + 'px';
   glow.style.top = e.clientY + 'px';
+
+  // debounce mouse activity: after a short delay, ensure rx-run is active
+  // and adjust the "nonvisible" flags accordingly
+  if (window._rxMouseTimer) clearTimeout(window._rxMouseTimer);
+  window._rxMouseTimer = setTimeout(() => {
+    safeSetVar('rx-run', true);
+    safeSetVar('rx-inside-nonvisible', false);
+    safeSetVar('rx-run-nonvisible', false);
+  }, 200);
 });
