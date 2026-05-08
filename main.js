@@ -19,6 +19,20 @@ function setVar(name, value) {
   }
 }
 
+function prepareRxInsideHidden() {
+  setVar('rx-inside-pause-pfad', true);
+  setVar('rx-inside-reset', false);
+  setVar('rx-inside-nonvisible', true);
+  setVar('rx-inside', false);
+  rxInsideActive = false;
+}
+
+function ensureRxInsideHidden() {
+  prepareRxInsideHidden();
+  requestAnimationFrame(() => prepareRxInsideHidden());
+  setTimeout(() => prepareRxInsideHidden(), 50);
+}
+
 // ─── rx-inside starten ───────────────────────────────────────────────────────
 function startRxInside() {
   if (rxRunActive) return; // Sperre: rx-run läuft noch
@@ -30,6 +44,7 @@ function startRxInside() {
 
   // Sauber resetten damit Spline-Timeline von vorne startet
   setVar('rx-inside-pause-pfad', false);
+  setVar('rx-inside-nonvisible', false);
   setVar('rx-inside', false);
   setVar('rx-inside-reset', true);
 
@@ -42,25 +57,28 @@ function startRxInside() {
 
 // ─── rx-inside stoppen ───────────────────────────────────────────────────────
 function stopRxInside() {
-  setVar('rx-inside-pause-pfad', true);
-  setVar('rx-inside', false);
-  rxInsideActive = false;
+  prepareRxInsideHidden();
 }
 
 function restartRxInsideOnly() {
   if (lastColor !== 'color-magenta') return;
 
   setVar('rx-inside-pause-pfad', false);
+  setVar('rx-inside-nonvisible', false);
   setVar('rx-inside', false);
   setVar('rx-inside-reset', true);
 
   setTimeout(() => {
     if (lastColor !== 'color-magenta') return;
     setVar('rx-inside-reset', false);
+    setVar('rx-inside-nonvisible', false);
     setVar('rx-inside', true);
     rxInsideActive = true;
   }, 20);
 }
+
+// Hide rx-inside as early as possible to avoid a visible flash on page load.
+ensureRxInsideHidden();
 
 // ─── rx-run starten ──────────────────────────────────────────────────────────
 function startRxRun() {
@@ -68,6 +86,7 @@ function startRxRun() {
 
   // inside pausieren statt auf false zu setzen, damit die Timeline nicht rückwärts läuft.
   setVar('rx-inside-pause-pfad', true);
+  setVar('rx-inside-nonvisible', true);
   setVar('rx-inside', true);
   rxInsideActive = false;
   setVar('rx-run', true);
@@ -79,13 +98,15 @@ function startRxRun() {
     rxRunActive = false;
     rxRunTimer  = null;
 
-    // 7s Reset-Fenster für rx-inside, ohne die ganze Szene zu resetten
+    // 2s Reset-Fenster für rx-inside, ohne die ganze Szene zu resetten
     if (lastColor === 'color-magenta') {
       if (rxInsideRestartTimer) clearTimeout(rxInsideRestartTimer);
       rxInsideRestartTimer = setTimeout(() => {
         rxInsideRestartTimer = null;
         restartRxInsideOnly();
-      }, 7000);
+      }, 2000);
+    } else {
+      prepareRxInsideHidden();
     }
   }, 5000);
 }
@@ -127,7 +148,7 @@ function updateColor() {
     }
     // Magenta weg → alles stoppen (außer laufendes rx-run darf zu Ende)
     if (!rxRunActive) {
-      stopRxInside();
+      prepareRxInsideHidden();
     }
   }
 }
@@ -141,6 +162,9 @@ function toggleButton(btn) {
 // ─── Spline laden ────────────────────────────────────────────────────────────
 spline.load(SCENE_URL).then(() => {
   console.log('Spline geladen');
+
+  // Safety pass after the scene has loaded.
+  ensureRxInsideHidden();
 
   // Buttons verdrahten
   ['btn--red', 'btn--green', 'btn--blue'].forEach(cls => {
