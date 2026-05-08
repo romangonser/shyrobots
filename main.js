@@ -1,140 +1,150 @@
 import { Application } from 'https://unpkg.com/@splinetool/runtime/build/runtime.js';
 
 const SCENE_URL = 'https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode';
-
 const canvas = document.getElementById('spline-canvas');
 const spline = new Application(canvas);
 
-const splineDebug = document.createElement('div');
-splineDebug.style.cssText = `
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  z-index: 9999;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  font: 12px/1.3 system-ui, sans-serif;
-  pointer-events: none;
-`;
-splineDebug.textContent = 'Spline debug: waiting...';
-document.body.appendChild(splineDebug);
+// ─── State ───────────────────────────────────────────────────────────────────
+let rxInsideActive = false;   // ist rx-inside gerade an?
+let rxRunActive    = false;   // läuft rx-run gerade?
+let rxRunTimer     = null;    // 5s Sperre
+let lastColor      = 'color-basestate';
 
-function safeSetVar(name, value) {
-  if (spline && typeof spline.setVariable === 'function') {
+// ─── Hilfsfunktion ───────────────────────────────────────────────────────────
+function setVar(name, value) {
+  if (typeof spline.setVariable === 'function') {
     spline.setVariable(name, value);
-    console.log(`${name} ->`, value);
-    splineDebug.textContent = `${name} -> ${value}`;
-    return value;
-  } else {
-    console.warn('spline.setVariable not available yet for', name);
-    splineDebug.textContent = `spline.setVariable not available yet for ${name}`;
-    return false;
+    console.log(`${name} → ${value}`);
   }
 }
 
-function applyStartupState() {
-  safeSetVar('rx-run', true);
-  safeSetVar('rx-inside', true);
-  safeSetVar('rx-run-nonvisible', false);
-  safeSetVar('rx-inside-nonvisible', false);
-}
+// ─── rx-inside starten ───────────────────────────────────────────────────────
+function startRxInside() {
+  if (rxRunActive) return; // Sperre: rx-run läuft noch
 
-window.__setSplineVar = safeSetVar;
-window.__triggerRxInside = (value = true) => safeSetVar('rx-inside', value);
-window.__forceRxVisible = () => { applyStartupState(); return true; };
-window.__sceneUrl = SCENE_URL;
-window.__splineDebug = splineDebug;
-
-spline.load(SCENE_URL).then(() => {
-  console.log('geladen');
+  // Sauber resetten damit Spline-Timeline von vorne startet
+  setVar('rx-inside', false);
+  setVar('rx-inside-reset', true);
 
   setTimeout(() => {
-    applyStartupState();
-  }, 300);
+    setVar('rx-inside-reset', false);
+    setVar('rx-inside', true);
+    rxInsideActive = true;
+  }, 20);
+}
 
-  const buttons = {
-    red: document.querySelector('.btn--red'),
-    green: document.querySelector('.btn--green'),
-    blue: document.querySelector('.btn--blue'),
-    rxInsideTest: document.querySelector('.btn--rxinside-test'),
-  };
+// ─── rx-inside stoppen ───────────────────────────────────────────────────────
+function stopRxInside() {
+  setVar('rx-inside', false);
+  rxInsideActive = false;
+}
 
-  let lastActiveColor = 'color-basestate';
+// ─── rx-run starten ──────────────────────────────────────────────────────────
+function startRxRun() {
+  if (rxRunActive) return; // läuft bereits
 
-  function getColorState() {
-    const r = buttons.red.classList.contains('is-active');
-    const g = buttons.green.classList.contains('is-active');
-    const b = buttons.blue.classList.contains('is-active');
+  // rx-inside soll während rx-run weiter true bleiben, sonst läuft die Timeline rückwärts.
+  setVar('rx-inside', true);
+  rxInsideActive = false;
+  setVar('rx-run', true);
+  rxRunActive = true;
 
-    if (r && g && b) return 'color-white';
-    if (r && g) return 'color-yellow';
-    if (g && b) return 'color-cyan';
-    if (r && b) return 'color-magenta';
-    if (r) return 'color-red';
-    if (g) return 'color-green';
-    if (b) return 'color-blue';
-    return 'color-basestate';
-  }
+  // Nach 5s rx-run beenden
+  rxRunTimer = setTimeout(() => {
+    setVar('rx-run', false);
+    rxRunActive = false;
+    rxRunTimer  = null;
 
-  function updateColor() {
-    const newColor = getColorState();
+    // Falls Magenta noch aktiv: rx-inside neu starten
+    if (lastColor === 'color-magenta') {
+      startRxInside();
+    }
+  }, 5000);
+}
 
-    if (newColor !== lastActiveColor) {
-      if (lastActiveColor !== 'color-basestate') {
-        safeSetVar(lastActiveColor, false);
-      } else {
-        safeSetVar('color-basestate', false);
-      }
+// ─── Farb-Logik ──────────────────────────────────────────────────────────────
+function getColorState() {
+  const r = document.querySelector('.btn--red')?.classList.contains('is-active');
+  const g = document.querySelector('.btn--green')?.classList.contains('is-active');
+  const b = document.querySelector('.btn--blue')?.classList.contains('is-active');
 
-      if (newColor !== 'color-basestate') {
-        safeSetVar(newColor, true);
-      } else {
-        safeSetVar('color-basestate', true);
-      }
+  if (r && g && b) return 'color-white';
+  if (r && g)      return 'color-yellow';
+  if (g && b)      return 'color-cyan';
+  if (r && b)      return 'color-magenta';
+  if (r)           return 'color-red';
+  if (g)           return 'color-green';
+  if (b)           return 'color-blue';
+  return 'color-basestate';
+}
 
-      lastActiveColor = newColor;
-      console.log('Color combo:', newColor);
+function updateColor() {
+  const newColor = getColorState();
+  if (newColor === lastColor) return;
 
-      if (newColor === 'color-magenta') {
-        safeSetVar('rx-inside', true);
-      } else {
-        safeSetVar('rx-inside', false);
-      }
+  // Alten Farbboolean ausschalten
+  setVar(lastColor, false);
+
+  // Neuen einschalten
+  setVar(newColor, true);
+
+  lastColor = newColor;
+
+  if (newColor === 'color-magenta') {
+    startRxInside();
+  } else {
+    // Magenta weg → alles stoppen (außer laufendes rx-run darf zu Ende)
+    if (!rxRunActive) {
+      stopRxInside();
     }
   }
+}
 
-  function toggleButton(btn) {
-    btn.classList.toggle('is-active');
-    btn.setAttribute('aria-pressed', String(btn.classList.contains('is-active')));
-    updateColor();
-  }
+function toggleButton(btn) {
+  btn.classList.toggle('is-active');
+  btn.setAttribute('aria-pressed', String(btn.classList.contains('is-active')));
+  updateColor();
+}
 
-  [buttons.red, buttons.green, buttons.blue].forEach(btn => {
-    if (btn) btn.addEventListener('click', () => toggleButton(btn));
+// ─── Spline laden ────────────────────────────────────────────────────────────
+spline.load(SCENE_URL).then(() => {
+  console.log('Spline geladen');
+
+  // Buttons verdrahten
+  ['btn--red', 'btn--green', 'btn--blue'].forEach(cls => {
+    document.querySelector(`.${cls}`)?.addEventListener('click', e => {
+      toggleButton(e.currentTarget);
+    });
   });
 
-  if (buttons.rxInsideTest) {
-    buttons.rxInsideTest.addEventListener('pointerdown', () => {
-      buttons.rxInsideTest.classList.add('is-active');
-      buttons.rxInsideTest.setAttribute('aria-pressed', 'true');
-      safeSetVar('rx-inside', true);
+  // Debug button: log internal state
+  const debugBtn = document.querySelector('.btn--fn-debug-state');
+  if (debugBtn) {
+    debugBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const state = {
+        rxInsideActive,
+        rxRunActive,
+        rxRunTimer: rxRunTimer !== null,
+        lastColor,
+        colorState: getColorState(),
+      };
+      console.log('DEBUG STATE', state);
+      alert('DEBUG STATE:\n' + JSON.stringify(state, null, 2));
     });
-
-    const releaseRxInsideTest = () => {
-      buttons.rxInsideTest.classList.remove('is-active');
-      buttons.rxInsideTest.setAttribute('aria-pressed', 'false');
-      safeSetVar('rx-inside', false);
-    };
-
-    buttons.rxInsideTest.addEventListener('pointerup', releaseRxInsideTest);
-    buttons.rxInsideTest.addEventListener('pointerleave', releaseRxInsideTest);
-    buttons.rxInsideTest.addEventListener('pointercancel', releaseRxInsideTest);
   }
+
+  // Klick im Viewport → rx-run starten (nur wenn rx-inside aktiv)
+  document.addEventListener('click', (e) => {
+    // Klicks auf Buttons ignorieren
+    if (e.target.closest('.btn')) return;
+    if (rxInsideActive) {
+      startRxRun();
+    }
+  });
 });
 
-// Cursor Glow
+// ─── Cursor Glow ─────────────────────────────────────────────────────────────
 const glow = document.createElement('div');
 glow.style.cssText = `
   position: fixed;
@@ -148,14 +158,7 @@ glow.style.cssText = `
 `;
 document.body.appendChild(glow);
 
-document.addEventListener('mousemove', (e) => {
+document.addEventListener('mousemove', e => {
   glow.style.left = e.clientX + 'px';
-  glow.style.top = e.clientY + 'px';
-
-  if (window._rxMouseTimer) clearTimeout(window._rxMouseTimer);
-  window._rxMouseTimer = setTimeout(() => {
-    safeSetVar('rx-run', true);
-    safeSetVar('rx-inside-nonvisible', false);
-    safeSetVar('rx-run-nonvisible', false);
-  }, 200);
+  glow.style.top  = e.clientY + 'px';
 });
