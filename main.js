@@ -1,4 +1,6 @@
-import { Application } from 'https://unpkg.com/@splinetool/runtime@1.9.82/build/runtime.js';
+import { Application } from 'https://unpkg.com/@splinetool/runtime/build/runtime.js';
+
+const SCENE_URL = 'https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode';
 
 const canvas = document.getElementById('spline-canvas');
 const spline = new Application(canvas);
@@ -32,20 +34,30 @@ function safeSetVar(name, value) {
   }
 }
 
-window.__setSplineVar = safeSetVar;
-window.__triggerRxInside = (value = true) => safeSetVar('rx-inside', value);
-window.__splineDebug = splineDebug;
-spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then(() => {
-  console.log('geladen');
-  // ensure rx-run is active at start
+function applyStartupState() {
   safeSetVar('rx-run', true);
+  safeSetVar('rx-inside', true);
   safeSetVar('rx-run-nonvisible', false);
   safeSetVar('rx-inside-nonvisible', false);
+}
+
+window.__setSplineVar = safeSetVar;
+window.__triggerRxInside = (value = true) => safeSetVar('rx-inside', value);
+window.__forceRxVisible = () => {
+  applyStartupState();
+  return true;
+};
+window.__sceneUrl = SCENE_URL;
+window.__splineDebug = splineDebug;
+spline.load(SCENE_URL).then(() => {
+  console.log('geladen');
+  // let Spline's own Start/Animation timeline run first
 
   const buttons = {
     red: document.querySelector('.btn--red'),
     green: document.querySelector('.btn--green'),
     blue: document.querySelector('.btn--blue'),
+    rxInsideTest: document.querySelector('.btn--rxinside-test'),
   };
 
   let lastActiveColor = 'color-basestate';
@@ -104,9 +116,27 @@ spline.load('https://prod.spline.design/tiUCnULhuI-Fare1/scene.splinecode').then
   }
 
   // Attach listeners
-  Object.values(buttons).forEach(btn => {
+  [buttons.red, buttons.green, buttons.blue].forEach(btn => {
     if (btn) btn.addEventListener('click', () => toggleButton(btn));
   });
+
+  if (buttons.rxInsideTest) {
+    buttons.rxInsideTest.addEventListener('pointerdown', () => {
+      buttons.rxInsideTest.classList.add('is-active');
+      buttons.rxInsideTest.setAttribute('aria-pressed', 'true');
+      safeSetVar('rx-inside', true);
+    });
+
+    const releaseRxInsideTest = () => {
+      buttons.rxInsideTest.classList.remove('is-active');
+      buttons.rxInsideTest.setAttribute('aria-pressed', 'false');
+      safeSetVar('rx-inside', false);
+    };
+
+    buttons.rxInsideTest.addEventListener('pointerup', releaseRxInsideTest);
+    buttons.rxInsideTest.addEventListener('pointerleave', releaseRxInsideTest);
+    buttons.rxInsideTest.addEventListener('pointercancel', releaseRxInsideTest);
+  }
 });
 
 // Cursor Glow
@@ -128,6 +158,8 @@ document.addEventListener('mousemove', (e) => {
 
   // debounce mouse activity: after a short delay, ensure rx-run is active
   // and adjust the "nonvisible" flags accordingly
+
+  
   if (window._rxMouseTimer) clearTimeout(window._rxMouseTimer);
   window._rxMouseTimer = setTimeout(() => {
     safeSetVar('rx-run', true);
