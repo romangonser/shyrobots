@@ -8,6 +8,7 @@ const spline = new Application(canvas);
 let rxInsideActive = false;   // ist rx-inside gerade an?
 let rxRunActive    = false;   // läuft rx-run gerade?
 let rxRunTimer     = null;    // 5s Sperre
+let rxInsideRestartTimer = null; // 2s Reset-Fenster für rx-inside
 let lastColor      = 'color-basestate';
 
 // ─── Hilfsfunktion ───────────────────────────────────────────────────────────
@@ -21,6 +22,11 @@ function setVar(name, value) {
 // ─── rx-inside starten ───────────────────────────────────────────────────────
 function startRxInside() {
   if (rxRunActive) return; // Sperre: rx-run läuft noch
+
+  if (rxInsideRestartTimer) {
+    clearTimeout(rxInsideRestartTimer);
+    rxInsideRestartTimer = null;
+  }
 
   // Sauber resetten damit Spline-Timeline von vorne startet
   setVar('rx-inside-pause-pfad', false);
@@ -41,6 +47,21 @@ function stopRxInside() {
   rxInsideActive = false;
 }
 
+function restartRxInsideOnly() {
+  if (lastColor !== 'color-magenta') return;
+
+  setVar('rx-inside-pause-pfad', false);
+  setVar('rx-inside', false);
+  setVar('rx-inside-reset', true);
+
+  setTimeout(() => {
+    if (lastColor !== 'color-magenta') return;
+    setVar('rx-inside-reset', false);
+    setVar('rx-inside', true);
+    rxInsideActive = true;
+  }, 20);
+}
+
 // ─── rx-run starten ──────────────────────────────────────────────────────────
 function startRxRun() {
   if (rxRunActive) return; // läuft bereits
@@ -52,18 +73,21 @@ function startRxRun() {
   setVar('rx-run', true);
   rxRunActive = true;
 
-  // Nach 7s rx-run beenden
+  // Nach 5s rx-run beenden
   rxRunTimer = setTimeout(() => {
     setVar('rx-run', false);
     rxRunActive = false;
     rxRunTimer  = null;
 
-    // Falls Magenta noch aktiv: rx-inside neu starten
+    // 7s Reset-Fenster für rx-inside, ohne die ganze Szene zu resetten
     if (lastColor === 'color-magenta') {
-      setVar('rx-inside-pause-pfad', false);
-      startRxInside();
+      if (rxInsideRestartTimer) clearTimeout(rxInsideRestartTimer);
+      rxInsideRestartTimer = setTimeout(() => {
+        rxInsideRestartTimer = null;
+        restartRxInsideOnly();
+      }, 7000);
     }
-  }, 7000);
+  }, 5000);
 }
 
 // ─── Farb-Logik ──────────────────────────────────────────────────────────────
@@ -97,6 +121,10 @@ function updateColor() {
   if (newColor === 'color-magenta') {
     startRxInside();
   } else {
+    if (rxInsideRestartTimer) {
+      clearTimeout(rxInsideRestartTimer);
+      rxInsideRestartTimer = null;
+    }
     // Magenta weg → alles stoppen (außer laufendes rx-run darf zu Ende)
     if (!rxRunActive) {
       stopRxInside();
