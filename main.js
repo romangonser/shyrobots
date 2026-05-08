@@ -23,6 +23,7 @@ function startRxInside() {
   if (rxRunActive) return; // Sperre: rx-run läuft noch
 
   // Sauber resetten damit Spline-Timeline von vorne startet
+  setVar('rx-inside-pause-pfad', false);
   setVar('rx-inside', false);
   setVar('rx-inside-reset', true);
 
@@ -35,6 +36,7 @@ function startRxInside() {
 
 // ─── rx-inside stoppen ───────────────────────────────────────────────────────
 function stopRxInside() {
+  setVar('rx-inside-pause-pfad', true);
   setVar('rx-inside', false);
   rxInsideActive = false;
 }
@@ -43,13 +45,14 @@ function stopRxInside() {
 function startRxRun() {
   if (rxRunActive) return; // läuft bereits
 
-  // rx-inside soll während rx-run weiter true bleiben, sonst läuft die Timeline rückwärts.
+  // inside pausieren statt auf false zu setzen, damit die Timeline nicht rückwärts läuft.
+  setVar('rx-inside-pause-pfad', true);
   setVar('rx-inside', true);
   rxInsideActive = false;
   setVar('rx-run', true);
   rxRunActive = true;
 
-  // Nach 5s rx-run beenden
+  // Nach 7s rx-run beenden
   rxRunTimer = setTimeout(() => {
     setVar('rx-run', false);
     rxRunActive = false;
@@ -57,9 +60,10 @@ function startRxRun() {
 
     // Falls Magenta noch aktiv: rx-inside neu starten
     if (lastColor === 'color-magenta') {
+      setVar('rx-inside-pause-pfad', false);
       startRxInside();
     }
-  }, 5000);
+  }, 7000);
 }
 
 // ─── Farb-Logik ──────────────────────────────────────────────────────────────
