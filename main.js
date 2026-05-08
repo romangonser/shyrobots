@@ -43,15 +43,16 @@ function applyStartupState() {
 
 window.__setSplineVar = safeSetVar;
 window.__triggerRxInside = (value = true) => safeSetVar('rx-inside', value);
-window.__forceRxVisible = () => {
-  applyStartupState();
-  return true;
-};
+window.__forceRxVisible = () => { applyStartupState(); return true; };
 window.__sceneUrl = SCENE_URL;
 window.__splineDebug = splineDebug;
+
 spline.load(SCENE_URL).then(() => {
   console.log('geladen');
-  // let Spline's own Start/Animation timeline run first
+
+  setTimeout(() => {
+    applyStartupState();
+  }, 300);
 
   const buttons = {
     red: document.querySelector('.btn--red'),
@@ -62,14 +63,11 @@ spline.load(SCENE_URL).then(() => {
 
   let lastActiveColor = 'color-basestate';
 
-  // reuse global safeSetVar
-
   function getColorState() {
     const r = buttons.red.classList.contains('is-active');
     const g = buttons.green.classList.contains('is-active');
     const b = buttons.blue.classList.contains('is-active');
 
-    // Build color from binary state (RGB)
     if (r && g && b) return 'color-white';
     if (r && g) return 'color-yellow';
     if (g && b) return 'color-cyan';
@@ -84,14 +82,12 @@ spline.load(SCENE_URL).then(() => {
     const newColor = getColorState();
 
     if (newColor !== lastActiveColor) {
-      // Turn off old color
       if (lastActiveColor !== 'color-basestate') {
         safeSetVar(lastActiveColor, false);
       } else {
         safeSetVar('color-basestate', false);
       }
 
-      // Turn on new color
       if (newColor !== 'color-basestate') {
         safeSetVar(newColor, true);
       } else {
@@ -100,7 +96,7 @@ spline.load(SCENE_URL).then(() => {
 
       lastActiveColor = newColor;
       console.log('Color combo:', newColor);
-      // if magenta is active, enable rx-inside; otherwise disable it
+
       if (newColor === 'color-magenta') {
         safeSetVar('rx-inside', true);
       } else {
@@ -115,7 +111,6 @@ spline.load(SCENE_URL).then(() => {
     updateColor();
   }
 
-  // Attach listeners
   [buttons.red, buttons.green, buttons.blue].forEach(btn => {
     if (btn) btn.addEventListener('click', () => toggleButton(btn));
   });
@@ -152,14 +147,11 @@ glow.style.cssText = `
   z-index: 10;
 `;
 document.body.appendChild(glow);
+
 document.addEventListener('mousemove', (e) => {
   glow.style.left = e.clientX + 'px';
   glow.style.top = e.clientY + 'px';
 
-  // debounce mouse activity: after a short delay, ensure rx-run is active
-  // and adjust the "nonvisible" flags accordingly
-
-  
   if (window._rxMouseTimer) clearTimeout(window._rxMouseTimer);
   window._rxMouseTimer = setTimeout(() => {
     safeSetVar('rx-run', true);

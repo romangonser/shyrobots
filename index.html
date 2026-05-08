@@ -3,93 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>The Shy Robots</title>
-
   <link rel="stylesheet" href="style.css" />
-
-  <!-- SPLINE VIEWER -->
-<!-- Spline script raus, type="module" rein -->
-<script type="module" src="main.js"></script>
+  <script type="module" src="main.js"></script>
 </head>
 
 <body>
-
   <main>
 
-    <!-- HERO -->
     <section class="hero">
-
       <div class="hero-left">
         <h1>the shy robots</h1>
       </div>
-
       <div class="hero-right">
         <p>
           They fear you — but they love colors.
           <br>
           If you choose the right color, they might come out of their hiding places.
-      
         </p>
       </div>
-
     </section>
 
-    <!-- COLOR PICKER -->
     <section class="colorpickers" aria-label="Color picker">
-
-      <button
-        class="btn btn--red"
-        type="button"
-        aria-pressed="false">
-        RED
-      </button>
-
-      <button
-        class="btn btn--green"
-        type="button"
-        aria-pressed="false">
-        GREEN
-      </button>
-
-      <button
-        class="btn btn--blue"
-        type="button"
-        aria-pressed="false">
-        BLUE
-      </button>
-
-      <button
-        class="btn btn--rxinside-test"
-        type="button"
-        aria-pressed="false">
-        RX INSIDE TEST
-      </button>
-
+      <button class="btn btn--red" type="button" aria-pressed="false">RED</button>
+      <button class="btn btn--green" type="button" aria-pressed="false">GREEN</button>
+      <button class="btn btn--blue" type="button" aria-pressed="false">BLUE</button>
+      <button class="btn btn--rxinside-test" type="button" aria-pressed="false">RX INSIDE TEST</button>
     </section>
 
-    <!-- SPLINE -->
     <section class="window">
-
       <div class="canvas-wrapper">
-
         <div class="canvas-inner">
-
- <canvas id="spline-canvas" style="width:100%;height:100%;display:block;"></canvas>
-
+          <canvas id="spline-canvas" style="width:100%;height:100%;display:block;"></canvas>
         </div>
-
       </div>
-
     </section>
 
   </main>
 
-  <!-- FOOTER -->
   <footer>
     <span>a project made with spline</span>
     <span>2026 © roman gonser</span>
   </footer>
-
 </body>
 </html>
