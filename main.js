@@ -10,6 +10,9 @@ let rxRunActive    = false;   // läuft rx-run gerade?
 let rxRunTimer     = null;    // 5s Sperre
 let rxInsideRestartTimer = null; // 2s Reset-Fenster für rx-inside
 let lastColor      = 'color-basestate';
+let mouseMoveStart = null; // timestamp when continuous move started
+let mouseMoveTriggerTimer = null; // fires after 500ms of continuous move
+let mouseMovementStoppedTimer = null; // detects short pauses to cancel tracking
 
 // ─── Hilfsfunktion ───────────────────────────────────────────────────────────
 function setVar(name, value) {
@@ -22,11 +25,12 @@ function setVar(name, value) {
 function prepareRxInsideHidden() {
   setVar('rx-inside-pause-pfad', true);
   setVar('rx-inside-reset', false);
-  setVar('rx-inside-nonvisible', true);
+  // setVar('rx-inside-nonvisible', true);
   setVar('rx-inside', false);
   rxInsideActive = false;
 }
 
+// ─── teit mouse move ───────────────────────────────────────────────────────
 function ensureRxInsideHidden() {
   prepareRxInsideHidden();
   requestAnimationFrame(() => prepareRxInsideHidden());
@@ -44,7 +48,7 @@ function startRxInside() {
 
   // Sauber resetten damit Spline-Timeline von vorne startet
   setVar('rx-inside-pause-pfad', false);
-  setVar('rx-inside-nonvisible', false);
+  // setVar('rx-inside-nonvisible', false);
   setVar('rx-inside', false);
   setVar('rx-inside-reset', true);
 
@@ -64,14 +68,14 @@ function restartRxInsideOnly() {
   if (lastColor !== 'color-magenta') return;
 
   setVar('rx-inside-pause-pfad', false);
-  setVar('rx-inside-nonvisible', false);
+  // setVar('rx-inside-nonvisible', false);
   setVar('rx-inside', false);
   setVar('rx-inside-reset', true);
 
   setTimeout(() => {
     if (lastColor !== 'color-magenta') return;
     setVar('rx-inside-reset', false);
-    setVar('rx-inside-nonvisible', false);
+    // setVar('rx-inside-nonvisible', false);
     setVar('rx-inside', true);
     rxInsideActive = true;
   }, 20);
@@ -86,7 +90,7 @@ function startRxRun() {
 
   // inside pausieren statt auf false zu setzen, damit die Timeline nicht rückwärts läuft.
   setVar('rx-inside-pause-pfad', true);
-  setVar('rx-inside-nonvisible', true);
+  // setVar('rx-inside-nonvisible', true);
   setVar('rx-inside', true);
   rxInsideActive = false;
   setVar('rx-run', true);
@@ -104,11 +108,11 @@ function startRxRun() {
       rxInsideRestartTimer = setTimeout(() => {
         rxInsideRestartTimer = null;
         restartRxInsideOnly();
-      }, 2000);
+      }, 20);
     } else {
       prepareRxInsideHidden();
     }
-  }, 5000);
+  }, 4500);
 }
 
 // ─── Farb-Logik ──────────────────────────────────────────────────────────────
@@ -197,6 +201,44 @@ spline.load(SCENE_URL).then(() => {
     if (rxInsideActive) {
       startRxRun();
     }
+  });
+
+  // Mousemove im Viewport: wenn die Maus kontinuierlich bewegt wird
+  // und die Bewegung länger als 0.5s andauert, hat das den gleichen
+  // Effekt wie ein Klick (rx-run), außer wenn die Bewegung über Buttons ist.
+  document.addEventListener('mousemove', (e) => {
+    // Bewegung über Buttons ignorieren
+    if (e.target.closest && e.target.closest('.btn')) {
+      if (mouseMoveStart) {
+        clearTimeout(mouseMoveTriggerTimer);
+        mouseMoveTriggerTimer = null;
+        mouseMoveStart = null;
+      }
+      return;
+    }
+
+    if (!mouseMoveStart) {
+      mouseMoveStart = Date.now();
+      mouseMoveTriggerTimer = setTimeout(() => {
+        if (mouseMoveStart && (Date.now() - mouseMoveStart) >= 500) {
+          const el = document.elementFromPoint(e.clientX, e.clientY);
+          if (!(el && el.closest && el.closest('.btn'))) {
+            if (rxInsideActive) startRxRun();
+          }
+        }
+        mouseMoveStart = null;
+        mouseMoveTriggerTimer = null;
+      }, 500);
+    }
+
+    if (mouseMovementStoppedTimer) clearTimeout(mouseMovementStoppedTimer);
+    mouseMovementStoppedTimer = setTimeout(() => {
+      if (mouseMoveStart) {
+        clearTimeout(mouseMoveTriggerTimer);
+        mouseMoveTriggerTimer = null;
+        mouseMoveStart = null;
+      }
+    }, 150);
   });
 });
 
